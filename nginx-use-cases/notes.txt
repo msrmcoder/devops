@@ -1,0 +1,128 @@
+Refernce:
+Inside NGINX: How We Designed for Performance & Scale
+https://www.nginx.com/blog/inside-nginx-how-we-designed-for-performance-scale/
+
+nginx: Andrew Alexeev
+https://www.aosabook.org/en/nginx.html
+
+$ find / -name nginx.conf -type f 2> /dev/null
+/usr/local/etc/nginx/nginx.conf
+/usr/local/Cellar/nginx/1.21.6_1/.bottle/etc/nginx/nginx.conf
+/System/Volumes/Data/usr/local/etc/nginx/nginx.conf
+/System/Volumes/Data/usr/local/Cellar/nginx/1.21.6_1/.bottle/etc/nginx/nginx.conf
+/System/Volumes/Data/Applications/Xcode.app/Contents/Developer/usr/share/xcs/Nginx/conf/nginx.conf
+/Applications/Xcode.app/Contents/Developer/usr/share/xcs/Nginx/conf/nginx.conf
+
+# Issues 1:
+# Suppose nginx shut down incorrectly, then brew cannot start and throws error as below
+$ brew services start nginx
+Bootstrap failed: 5: Input/output error
+Try re-running the command as root for richer errors.
+Error: Failure while executing; `/bin/launchctl bootstrap gui/501 /Users/srirammuthaiah/Library/LaunchAgents/homebrew.mxcl.nginx.plist` exited with 5.
+
+# To solve this error, do the following...
+$ brew services restart nginx
+Stopping `nginx`... (might take a while)
+==> Successfully stopped `nginx` (label: homebrew.mxcl.nginx)
+==> Successfully started `nginx` (label: homebrew.mxcl.nginx)
+
+# To start, stop and know status of nginx
+$ brew services start nginx
+==> Successfully started `nginx` (label: homebrew.mxcl.nginx)
+
+$ brew services stop nginx
+==> Successfully stopped `nginx` (label: homebrew.mxcl.nginx)
+
+$ brew services info nginx
+nginx (homebrew.mxcl.nginx)
+Running: ✔
+Loaded: ✔
+Schedulable: ✘
+User: srirammuthaiah
+PID: 19153
+
+# To see nginx current network connection details
+$ lsof -i 4 -a -p <NGINX_PID>
+
+(OR)
+
+$ lsof -i 4 -a -c nginx
+
+# To see port 80 is open or not
+$ lsof -iTCP:80
+
+(OR)
+
+$ lsof -iTCP:80 -sTCP:LISTEN
+
+# To see nginx process details
+$ ps -ef | grep nginx
+
+(OR)
+
+ps aux | grep nginx
+
+# To spit out nginx.conf from the running nginx process
+$ nginx -T # shows config file path and current config displayed on the screen
+
+# To find out all signals
+$ kill -l
+HUP INT QUIT ILL TRAP ABRT EMT FPE KILL BUS SEGV SYS PIPE ALRM TERM URG STOP TSTP CONT CHLD TTIN TTOU IO XCPU XFSZ VTALRM PROF WINCH INFO USR1 USR2
+
+#################################################################################
+# Experiment - Controlling nginx process by passing OS signals to master process 
+# reference-1: Controlling nginx: https://nginx.org/en/docs/control.html
+# reference-2: https://docs.nginx.com/nginx/admin-guide/basic-functionality/runtime-control/
+# First find out PID
+# To find out nginx.pid file
+$ find /usr -name nginx.pid -type f 2> /dev/null
+/usr/local/var/run/nginx.pid
+
+# step1: monitor nginx process in terminal 1
+$ watch ./nx_proc_watch.sh
+
+# step2: monitor nginx network traffic in terminal 2
+$ watch ./nx_network.sh
+
+# step3: change nginx config. 
+# for e.g. open nginx.conf
+# change "worker_processes 1;" to "worker_processes 2;"
+# save the file in vi editor by typing esc followed by :wq
+vi /usr/local/etc/nginx/nginx.conf
+
+# step4: pass HUP singal to master process using kill command
+kill -s HUP <Nginx Master Process ID>
+
+(OR)
+
+nginx -s <SIGNAL>
+where <SIGNAL> can be one of the following:
+
+quit – Shut down gracefully (the SIGQUIT signal)
+reload – Reload the configuration file (the SIGHUP signal)
+reopen – Reopen log files (the SIGUSR1 signal)
+stop – Shut down immediately (or fast shutdown, the SIGTERM singal)
+
+# step5: you can observe in new worker process created (in step1) and
+# new tcp connection started listening for the new worker_process (in step2)
+#################################################################################
+
+
+Installing from source and a module:
+-----------------------------------
+wget https://<...url of the nginx module source...>
+tar -xvf module.tar.gz
+wget https://nginx.org/download/nginx-1.21.6.tar.gz
+tar -xvf nginx-1.21.6.tar.gz
+cd nginx-1.21.6
+./configure --with-compact --add-dynamic-module=../headers-more-nginx-moduel --prefix=/opt/nginx
+make modules
+mkdir /usr/local/etc/nginx/modules
+cp objs/ngx_http_headers_more_filter_module.so /usr/local/etc/nginx/modules
+
+reference: https://www.nginx.com/blog/compiling-dynamic-modules-nginx-plus/
+
+
+
+
+
